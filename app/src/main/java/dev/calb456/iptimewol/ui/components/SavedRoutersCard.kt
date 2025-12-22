@@ -29,7 +29,7 @@ import dev.calb456.iptimewol.data.Router
 @Composable
 fun SavedRoutersCard(
     savedRouters: List<Router>,
-    productNames: Map<String, String>,
+    productNames: Map<String, String?>,
     onMoreClick: (Router) -> Unit,
     onItemClick: (Router) -> Unit
 ) {

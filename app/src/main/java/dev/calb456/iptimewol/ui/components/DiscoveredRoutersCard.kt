@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun DiscoveredRoutersCard(
     gatewayIp: String?,
-    productNames: Map<String, String>,
+    productNames: Map<String, String?>,
     loadingIps: Set<String>,
     onIpClick: (String) -> Unit,
     onRefreshClick: () -> Unit

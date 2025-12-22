@@ -55,6 +55,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation("androidx.compose.material:material:1.10.0")
     implementation("androidx.compose.material:material-icons-extended:1.6.7")
+    implementation("androidx.cardview:cardview:1.0.0") // Added for custom toast layout
     implementation(libs.coil.compose)
     implementation(libs.coil.svg)
     implementation(libs.ktor.client.android)

@@ -1,6 +1,9 @@
 package dev.calb456.iptimewol
 
+import android.content.Context
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
@@ -23,7 +26,16 @@ class MainActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this) {
             if (System.currentTimeMillis() > backPressedTime + 2000) {
                 backPressedTime = System.currentTimeMillis()
-                Toast.makeText(this@MainActivity, "한번 더 뒤로가기 하시면 앱이 종료됩니다.", Toast.LENGTH_SHORT).show()
+                val inflater = getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
+                val layout = inflater.inflate(R.layout.custom_toast, null)
+                val text = layout.findViewById<TextView>(R.id.toast_text)
+                text.text = "한번 더 뒤로가기 하시면 앱이 종료됩니다."
+
+                with(Toast(applicationContext)) {
+                    duration = Toast.LENGTH_SHORT
+                    view = layout
+                    show()
+                }
             } else {
                 finish()
             }
