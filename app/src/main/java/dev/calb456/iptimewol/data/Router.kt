@@ -10,5 +10,9 @@ data class Router(
     val ipAddress: String,
     val managementPort: Int,
     val loginId: String,
-    val password: String
+    val password: String,
+    val externalIpAddress: String? = null,
+    val ddnsAddress: String? = null,
+    val ddnsStatus: String? = null,
+    val remoteAccessPort: Int? = null
 )

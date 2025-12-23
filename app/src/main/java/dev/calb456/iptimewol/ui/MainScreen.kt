@@ -9,6 +9,15 @@ import android.view.LayoutInflater
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,19 +33,24 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.calb456.iptimewol.R
 import dev.calb456.iptimewol.data.Router
 import dev.calb456.iptimewol.ui.components.DiscoveredRoutersCard
 import dev.calb456.iptimewol.ui.components.Header
+import dev.calb456.iptimewol.ui.components.RouterActionSheet
 import dev.calb456.iptimewol.ui.components.SavedRoutersCard
-import dev.calb456.iptimewol.ui.sheet.AddRouterSheet
-import dev.calb456.iptimewol.ui.sheet.RouterActionSheet
+import dev.calb456.iptimewol.ui.screens.AddRouterScreen
 import kotlinx.coroutines.launch
+import java.io.Serializable
 
-@OptIn(ExperimentalMaterialApi::class, ExperimentalMaterial3Api::class)
+sealed class Screen : Serializable {
+    object Home : Screen()
+    object AddRouter : Screen()
+}
+
+@OptIn(ExperimentalMaterialApi::class, ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
 fun MainScreen(
     modifier: Modifier = Modifier, viewModel: MainViewModel = viewModel(
@@ -52,10 +66,8 @@ fun MainScreen(
     val addRouterResult by viewModel.addRouterResult.collectAsState()
     val preLoginCheckState by viewModel.preLoginCheckState.collectAsState()
 
-    val addRouterSheetState = rememberModalBottomSheetState(initialValue = ModalBottomSheetValue.Hidden, skipHalfExpanded = true)
     val routerActionSheetState = rememberModalBottomSheetState(initialValue = ModalBottomSheetValue.Hidden, skipHalfExpanded = true)
     val scope = rememberCoroutineScope()
-    val focusManager = LocalFocusManager.current
     var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
     var selectedRouter by remember { mutableStateOf<Router?>(null) }
 
@@ -63,10 +75,21 @@ fun MainScreen(
     var captchaRelativeUrlForSheet by remember { mutableStateOf<String?>(null) }
     var captchaFullUrlForSheet by remember { mutableStateOf<String?>(null) }
 
+    var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
+    var routerForExtendedFields by remember { mutableStateOf<Router?>(null) }
+    var showExtendedFields by remember { mutableStateOf(false) }
+
     LaunchedEffect(addRouterResult) {
         when (val result = addRouterResult) {
+            is AddRouterResult.ShowExtendedFields -> {
+                routerForExtendedFields = result.router
+                showExtendedFields = true
+                viewModel.resetAddRouterResult()
+            }
             is AddRouterResult.Success -> {
-                scope.launch { addRouterSheetState.hide() }
+                currentScreen = Screen.Home
+                routerForExtendedFields = null 
+                showExtendedFields = false
                 viewModel.resetAddRouterResult()
             }
             is AddRouterResult.Error -> {
@@ -93,10 +116,12 @@ fun MainScreen(
     LaunchedEffect(preLoginCheckState) {
         when (val state = preLoginCheckState) {
             is PreLoginCheckState.Ready -> {
+                routerForExtendedFields = null 
+                showExtendedFields = false
                 isCaptchaRequiredForSheet = state.isCaptchaRequired
                 captchaRelativeUrlForSheet = state.captchaRelativeUrl
                 captchaFullUrlForSheet = state.captchaRelativeUrl?.let { "http://${currentGatewayIp}$it" }
-                scope.launch { addRouterSheetState.show() }
+                currentScreen = Screen.AddRouter
                 viewModel.resetPreLoginState()
             }
             is PreLoginCheckState.Error -> {
@@ -128,19 +153,15 @@ fun MainScreen(
         )
     }
 
-    if (addRouterSheetState.isVisible) {
-        BackHandler(true) { scope.launch { addRouterSheetState.hide() } }
-    }
     if (routerActionSheetState.isVisible) {
         BackHandler(true) { scope.launch { routerActionSheetState.hide() } }
     }
 
-    LaunchedEffect(addRouterSheetState.isVisible) {
-        if (!addRouterSheetState.isVisible) {
-            focusManager.clearFocus()
-            isCaptchaRequiredForSheet = false
-            captchaRelativeUrlForSheet = null
-            captchaFullUrlForSheet = null
+    if (currentScreen != Screen.Home) {
+        BackHandler(true) {
+            currentScreen = Screen.Home
+            routerForExtendedFields = null 
+            showExtendedFields = false
         }
     }
 
@@ -148,75 +169,94 @@ fun MainScreen(
         viewModel.getGatewayIp(context)
     }
 
-    ModalBottomSheetLayout(
-        sheetState = addRouterSheetState,
-        sheetShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-        sheetContent = {
-            AddRouterSheet(
-                onDismiss = { scope.launch { addRouterSheetState.hide() } },
-                onConfirm = { router, captchaText ->
-                    viewModel.addRouter(router, captchaText, captchaRelativeUrlForSheet)
-                },
-                initialIpAddress = currentGatewayIp ?: "",
-                initialRouterName = productNames[currentGatewayIp] ?: "",
-                viewModel = viewModel,
-                addRouterResult = addRouterResult,
-                isCaptchaRequired = isCaptchaRequiredForSheet,
-                captchaImageUrl = captchaFullUrlForSheet
-            )
-        }
-    ) {
-        ModalBottomSheetLayout(
-            sheetState = routerActionSheetState,
-            sheetShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-            sheetContent = {
-                selectedRouter?.let { router ->
-                    RouterActionSheet(
-                        router = router,
-                        onDismiss = { scope.launch { routerActionSheetState.hide() } },
-                        onEdit = { /*TODO*/ },
-                        onDelete = {
-                            scope.launch { routerActionSheetState.hide() }
-                            showDeleteConfirmationDialog = true
-                        },
-                        onAccessManagement = { selectedRouter ->
-                            val url = "http://${selectedRouter.ipAddress}:${selectedRouter.managementPort}"
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                            context.startActivity(intent)
-                            scope.launch { routerActionSheetState.hide() }
-                        },
-                        onShowInfo = { /*TODO*/ }
-                    )
+    AnimatedContent(
+        targetState = currentScreen,
+        transitionSpec = {
+            if (targetState == Screen.Home) { // Going back to Home
+                slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)) + fadeIn() togetherWith
+                        slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(300)) + fadeOut()
+            } else { // Going to another screen
+                slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(300)) + fadeIn() togetherWith
+                        slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(300)) + fadeOut()
+            }
+        }, label = ""
+    ) { screen ->
+        when (screen) {
+            is Screen.Home -> {
+                ModalBottomSheetLayout(
+                    sheetState = routerActionSheetState,
+                    sheetShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                    sheetContent = {
+                        selectedRouter?.let { router ->
+                            RouterActionSheet(
+                                router = router,
+                                onDismiss = { scope.launch { routerActionSheetState.hide() } },
+                                onEdit = { /*TODO*/ },
+                                onDelete = {
+                                    scope.launch { routerActionSheetState.hide() }
+                                    showDeleteConfirmationDialog = true
+                                },
+                                onAccessManagement = { routerForManagement ->
+                                    val url = "http://${routerForManagement.ipAddress}:${routerForManagement.managementPort}"
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                    context.startActivity(intent)
+                                    scope.launch { routerActionSheetState.hide() }
+                                },
+                                onShowInfo = { /*TODO*/ }
+                            )
+                        }
+                    }
+                ) {
+                    Column(modifier = modifier.fillMaxSize()) {
+                        Header()
+                        LazyColumn {
+                            item {
+                                SavedRoutersCard(
+                                    savedRouters = savedRouters,
+                                    productNames = productNames,
+                                    onMoreClick = { router ->
+                                        selectedRouter = router
+                                        scope.launch { routerActionSheetState.show() }
+                                    },
+                                    onItemClick = { router ->
+                                        Log.d(
+                                            "MainScreen",
+                                            "Router clicked: $router"
+                                        )
+                                    }
+                                )
+                            }
+                            item {
+                                DiscoveredRoutersCard(
+                                    gatewayIp = gatewayIp,
+                                    productNames = productNames,
+                                    loadingIps = loadingIps,
+                                    onIpClick = {
+                                        currentGatewayIp = it
+                                        viewModel.handleDiscoveredRouterClick(it)
+                                    },
+                                    onRefreshClick = { viewModel.getGatewayIp(context) }
+                                )
+                            }
+                        }
+                    }
                 }
             }
-        ) {
-            Column(modifier = modifier.fillMaxSize()) {
-                Header()
-                LazyColumn {
-                    item {
-                        SavedRoutersCard(
-                            savedRouters = savedRouters,
-                            productNames = productNames,
-                            onMoreClick = { router ->
-                                selectedRouter = router
-                                scope.launch { routerActionSheetState.show() }
-                            },
-                            onItemClick = { router -> Log.d("MainScreen", "Router clicked: $router") }
-                        )
-                    }
-                    item {
-                        DiscoveredRoutersCard(
-                            gatewayIp = gatewayIp,
-                            productNames = productNames,
-                            loadingIps = loadingIps,
-                            onIpClick = {
-                                currentGatewayIp = it
-                                viewModel.handleDiscoveredRouterClick(it)
-                            },
-                            onRefreshClick = { viewModel.getGatewayIp(context) }
-                        )
-                    }
-                }
+            is Screen.AddRouter -> {
+                AddRouterScreen(
+                    onBack = { currentScreen = Screen.Home; showExtendedFields = false }, // Reset when going back
+                    onConfirm = { router, captchaText, isFinalAdd ->
+                        viewModel.addRouter(router, captchaText, captchaRelativeUrlForSheet, isFinalAdd)
+                    },
+                    initialIpAddress = currentGatewayIp ?: "",
+                    initialRouterName = productNames[currentGatewayIp] ?: "",
+                    viewModel = viewModel,
+                    addRouterResult = addRouterResult,
+                    isCaptchaRequired = isCaptchaRequiredForSheet,
+                    captchaImageUrl = captchaFullUrlForSheet,
+                    partialRouter = routerForExtendedFields,
+                    showExtendedFields = showExtendedFields
+                )
             }
         }
     }
