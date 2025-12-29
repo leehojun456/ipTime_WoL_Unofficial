@@ -12,6 +12,10 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.decodeFromJsonElement
+import dev.calb456.iptimewol.network.BaseResponse
+import dev.calb456.iptimewol.network.UnauthenticatedException
 
 class RouterApiService {
     private val client = HttpClient(Android) {
@@ -38,8 +42,18 @@ class RouterApiService {
                 headers.append("Referer", "http://$gatewayIp/ui/")
                 headers.append("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0")
             }
-            Log.d("RouterApiService", "Received $logTag response: ${response.status.value}, Body: ${response.body<String>()}")
-            response.body<Res>()
+            val jsonString = response.body<String>()
+            Log.d("RouterApiService", "Received $logTag response: ${response.status.value}, Body: $jsonString")
+
+            val errorCheck = Json.decodeFromString<BaseResponse<JsonElement>>(jsonString)
+
+            if (errorCheck.error != null && errorCheck.error.code == -31998 && errorCheck.error.message == "Unauthenticated") {
+                throw UnauthenticatedException()
+            }
+            
+            Json.decodeFromString<Res>(jsonString)
+        } catch (e: UnauthenticatedException) {
+            throw e // Re-throw to be caught by the ViewModel
         } catch (e: Exception) {
             Log.e("RouterApiService", "Error sending $logTag POST request to $url: ${e.message}", e)
             null
@@ -61,6 +75,7 @@ class RouterApiService {
         return makePostRequest<SimpleMethodRequest, NewCaptchaResponse>(gatewayIp, requestBody, "new captcha")
     }
 
+    // 로그인
     suspend fun login(gatewayIp: String, id: String, pw: String, captchaText: String?, captchaUrl: String?): LoginResponse? {
         val captchaInfo = if (captchaText != null && captchaUrl != null) {
             CaptchaInfo(text = captchaText, url = captchaUrl)
@@ -71,4 +86,11 @@ class RouterApiService {
         val requestBody = LoginRequest(method = "session/login", params = loginParams)
         return makePostRequest<LoginRequest, LoginResponse>(gatewayIp, requestBody, "login")
     }
+
+    // DDNS 설정 정보 가져옴
+    suspend fun getDdnsConfig(gatewayIp: String): DdnsConfigResponse? {
+        val requestBody = DdnsConfigRequest(method = "ddns/config", params = "iptime")
+        return makePostRequest<DdnsConfigRequest, DdnsConfigResponse>(gatewayIp, requestBody, "ddns config")
+    }
+
 }

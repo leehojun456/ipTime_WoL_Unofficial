@@ -45,11 +45,6 @@ import dev.calb456.iptimewol.ui.screens.AddRouterScreen
 import kotlinx.coroutines.launch
 import java.io.Serializable
 
-sealed class Screen : Serializable {
-    object Home : Screen()
-    object AddRouter : Screen()
-}
-
 @OptIn(ExperimentalMaterialApi::class, ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
 fun MainScreen(
@@ -57,7 +52,6 @@ fun MainScreen(
         factory = MainViewModelFactory(LocalContext.current.applicationContext as Application)
     )
 ) {
-    var currentGatewayIp by remember { mutableStateOf<String?>(null) }
     val savedRouters by viewModel.allRouters.collectAsState(initial = emptyList())
     val gatewayIp by viewModel.gatewayIp.collectAsState()
     val productNames by viewModel.productNames.collectAsState()
@@ -65,31 +59,25 @@ fun MainScreen(
     val context = LocalContext.current
     val addRouterResult by viewModel.addRouterResult.collectAsState()
     val preLoginCheckState by viewModel.preLoginCheckState.collectAsState()
+    val currentScreen by viewModel.currentScreen.collectAsState()
+    val currentGatewayIp by viewModel.currentGatewayIp.collectAsState()
+    val isCaptchaRequired by viewModel.isCaptchaRequired.collectAsState()
+    val captchaFullUrl by viewModel.captchaFullUrl.collectAsState()
+    val routerForExtendedFields by viewModel.routerForExtendedFields.collectAsState()
+    val showExtendedFields by viewModel.showExtendedFields.collectAsState()
 
     val routerActionSheetState = rememberModalBottomSheetState(initialValue = ModalBottomSheetValue.Hidden, skipHalfExpanded = true)
     val scope = rememberCoroutineScope()
     var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
     var selectedRouter by remember { mutableStateOf<Router?>(null) }
-
-    var isCaptchaRequiredForSheet by remember { mutableStateOf(false) }
-    var captchaRelativeUrlForSheet by remember { mutableStateOf<String?>(null) }
-    var captchaFullUrlForSheet by remember { mutableStateOf<String?>(null) }
-
-    var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
-    var routerForExtendedFields by remember { mutableStateOf<Router?>(null) }
-    var showExtendedFields by remember { mutableStateOf(false) }
-
+    
     LaunchedEffect(addRouterResult) {
         when (val result = addRouterResult) {
             is AddRouterResult.ShowExtendedFields -> {
-                routerForExtendedFields = result.router
-                showExtendedFields = true
-                viewModel.resetAddRouterResult()
+                // This is now handled in the ViewModel
             }
             is AddRouterResult.Success -> {
-                currentScreen = Screen.Home
-                routerForExtendedFields = null 
-                showExtendedFields = false
+                viewModel.navigateTo(Screen.Home)
                 viewModel.resetAddRouterResult()
             }
             is AddRouterResult.Error -> {
@@ -114,19 +102,14 @@ fun MainScreen(
     }
 
     LaunchedEffect(preLoginCheckState) {
-        when (val state = preLoginCheckState) {
+        when (preLoginCheckState) {
             is PreLoginCheckState.Ready -> {
-                routerForExtendedFields = null 
-                showExtendedFields = false
-                isCaptchaRequiredForSheet = state.isCaptchaRequired
-                captchaRelativeUrlForSheet = state.captchaRelativeUrl
-                captchaFullUrlForSheet = state.captchaRelativeUrl?.let { "http://${currentGatewayIp}$it" }
-                currentScreen = Screen.AddRouter
+                viewModel.navigateTo(Screen.AddRouter)
                 viewModel.resetPreLoginState()
             }
             is PreLoginCheckState.Error -> {
                 scope.launch {
-                    Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, (preLoginCheckState as PreLoginCheckState.Error).message, Toast.LENGTH_LONG).show()
                 }
                 viewModel.resetPreLoginState()
             }
@@ -159,9 +142,7 @@ fun MainScreen(
 
     if (currentScreen != Screen.Home) {
         BackHandler(true) {
-            currentScreen = Screen.Home
-            routerForExtendedFields = null 
-            showExtendedFields = false
+            viewModel.onBackToHome()
         }
     }
 
@@ -232,7 +213,7 @@ fun MainScreen(
                                     productNames = productNames,
                                     loadingIps = loadingIps,
                                     onIpClick = {
-                                        currentGatewayIp = it
+                                        viewModel.setCurrentGatewayIp(it)
                                         viewModel.handleDiscoveredRouterClick(it)
                                     },
                                     onRefreshClick = { viewModel.getGatewayIp(context) }
@@ -244,16 +225,16 @@ fun MainScreen(
             }
             is Screen.AddRouter -> {
                 AddRouterScreen(
-                    onBack = { currentScreen = Screen.Home; showExtendedFields = false }, // Reset when going back
+                    onBack = { viewModel.onBackToHome() },
                     onConfirm = { router, captchaText, isFinalAdd ->
-                        viewModel.addRouter(router, captchaText, captchaRelativeUrlForSheet, isFinalAdd)
+                        viewModel.addRouter(router, captchaText, null, isFinalAdd)
                     },
                     initialIpAddress = currentGatewayIp ?: "",
                     initialRouterName = productNames[currentGatewayIp] ?: "",
                     viewModel = viewModel,
                     addRouterResult = addRouterResult,
-                    isCaptchaRequired = isCaptchaRequiredForSheet,
-                    captchaImageUrl = captchaFullUrlForSheet,
+                    isCaptchaRequired = isCaptchaRequired,
+                    captchaImageUrl = captchaFullUrl,
                     partialRouter = routerForExtendedFields,
                     showExtendedFields = showExtendedFields
                 )

@@ -57,13 +57,19 @@ fun AddRouterScreen(
     var captchaInput by remember(initialIpAddress) { mutableStateOf("") }
     
     // These fields are for the extended section
-    var externalIpAddress by remember(initialIpAddress) { mutableStateOf("") }
-    var ddnsAddress by remember(initialIpAddress) { mutableStateOf("") }
-    var ddnsStatus by remember(initialIpAddress) { mutableStateOf("") }
-    var remoteAccessPort by remember(initialIpAddress) { mutableStateOf("") }
+    var externalIpAddress by remember(initialIpAddress) { mutableStateOf(partialRouter?.externalIpAddress ?: "") }
+    var ddnsAddress by remember(initialIpAddress) { mutableStateOf(partialRouter?.ddnsAddress ?: "") }
+    var ddnsStatus by remember(initialIpAddress) { mutableStateOf(partialRouter?.ddnsStatus ?: "") }
+    var ddnsRegistrationEmail by remember(initialIpAddress) { mutableStateOf("") }
+    var remoteAccessPort by remember(initialIpAddress) { mutableStateOf(partialRouter?.remoteAccessPort?.toString() ?: "") }
 
     val focusManager = LocalFocusManager.current
-    val (nameFocus, ipFocus, portFocus, idFocus, passwordFocus, captchaFocus, extIpFocus, ddnsFocus, ddnsStatusFocus, remotePortFocus) = remember { FocusRequester.createRefs() }
+    val (nameFocus, ipFocus, portFocus, idFocus, passwordFocus, captchaFocus, extIpFocus, ddnsFocus, ddnsEmailFocus, ddnsStatusFocus, remotePortFocus) = remember { FocusRequester.createRefs() }
+
+    val showManualDdnsInput = when (addRouterResult) {
+        is AddRouterResult.ShowExtendedFields -> addRouterResult.showManualDdnsInput
+        else -> false
+    }
 
     LaunchedEffect(showExtendedFields) {
         if (showExtendedFields) {
@@ -268,7 +274,8 @@ fun AddRouterScreen(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Next),
                     keyboardActions = KeyboardActions(onNext = { ddnsFocus.requestFocus() }),
-                    colors = textFieldColors
+                    colors = textFieldColors,
+                    enabled = showManualDdnsInput
                 )
 
                 TextField(
@@ -278,9 +285,23 @@ fun AddRouterScreen(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).focusRequester(ddnsFocus),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Next),
-                    keyboardActions = KeyboardActions(onNext = { ddnsStatusFocus.requestFocus() }),
-                    colors = textFieldColors
+                    keyboardActions = KeyboardActions(onNext = { if (showManualDdnsInput) ddnsEmailFocus.requestFocus() else ddnsStatusFocus.requestFocus() }),
+                    colors = textFieldColors,
+                    enabled = showManualDdnsInput
                 )
+                
+                if (showManualDdnsInput) {
+                    TextField(
+                        value = ddnsRegistrationEmail,
+                        onValueChange = { ddnsRegistrationEmail = it },
+                        label = { Text("DDNS 등록이메일") },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).focusRequester(ddnsEmailFocus),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Next),
+                        keyboardActions = KeyboardActions(onNext = { ddnsStatusFocus.requestFocus() }),
+                        colors = textFieldColors
+                    )
+                }
 
                 TextField(
                     value = ddnsStatus,
@@ -290,8 +311,20 @@ fun AddRouterScreen(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Next),
                     keyboardActions = KeyboardActions(onNext = { remotePortFocus.requestFocus() }),
-                    colors = textFieldColors
+                    colors = textFieldColors,
+                    enabled = showManualDdnsInput
                 )
+
+                if (showManualDdnsInput) {
+                    Button(
+                        onClick = { /* No action yet as per user request */ },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Text("DDNS 등록 적용")
+                    }
+                }
 
                 TextField(
                     value = remoteAccessPort,
