@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import dev.calb456.iptimewol.data.Router
 import dev.calb456.iptimewol.ui.AddRouterResult
+import dev.calb456.iptimewol.ui.DdnsDisplayState
 import dev.calb456.iptimewol.ui.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,6 +64,8 @@ fun AddRouterScreen(
     var ddnsRegistrationEmail by remember(initialIpAddress) { mutableStateOf("") }
     var remoteAccessPort by remember(initialIpAddress) { mutableStateOf(partialRouter?.remoteAccessPort?.toString() ?: "") }
 
+    val ddnsDisplayState by viewModel.ddnsDisplayState.collectAsState()
+
     val focusManager = LocalFocusManager.current
     val (nameFocus, ipFocus, portFocus, idFocus, passwordFocus, captchaFocus, extIpFocus, ddnsFocus, ddnsEmailFocus, ddnsStatusFocus, remotePortFocus) = remember { FocusRequester.createRefs() }
 
@@ -71,17 +74,37 @@ fun AddRouterScreen(
         else -> false
     }
 
-    LaunchedEffect(showExtendedFields) {
+    LaunchedEffect(showExtendedFields, ddnsDisplayState) {
         if (showExtendedFields) {
-            // This will be triggered when MainScreen sets showExtendedFields to true
             extIpFocus.requestFocus()
-            // If we have a partial router, populate the fields from it
             partialRouter?.let {
                 routerName = it.name
                 ipAddress = it.ipAddress
                 managementPort = it.managementPort.toString()
                 loginId = it.loginId
                 password = it.password
+            }
+            // Populate DDNS fields from ViewModel's ddnsDisplayState
+            when (ddnsDisplayState) {
+                is DdnsDisplayState.Loaded -> {
+                    val loaded = ddnsDisplayState as DdnsDisplayState.Loaded
+                    externalIpAddress = loaded.externalIp
+                    ddnsAddress = loaded.ddnsAddress
+                    ddnsStatus = loaded.status
+                }
+                DdnsDisplayState.NoDdnsRegistered -> {
+                    ddnsStatus = "DDNS 등록 필요"
+                    externalIpAddress = ""
+                    ddnsAddress = ""
+                }
+                is DdnsDisplayState.Error -> {
+                    ddnsStatus = "DDNS 정보 로드 오류" // Or show a toast/snackbar
+                    externalIpAddress = ""
+                    ddnsAddress = ""
+                }
+                else -> {
+                    // Do nothing for Idle or Loading states initially, wait for result
+                }
             }
         }
     }

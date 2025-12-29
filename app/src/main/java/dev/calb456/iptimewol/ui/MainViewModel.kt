@@ -17,6 +17,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.Serializable
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.isSuccess
 
 sealed class Screen : Serializable {
     object Home : Screen()
@@ -41,19 +45,95 @@ sealed class AddRouterResult {
 
 sealed class PreLoginCheckState {
 
+
+
+
+
+
+
     object Idle : PreLoginCheckState()
+
+
+
+
+
+
 
     object Loading : PreLoginCheckState()
 
+
+
+
+
+
+
     data class Ready(val isCaptchaRequired: Boolean, val captchaRelativeUrl: String?) : PreLoginCheckState()
 
+
+
+
+
+
+
     data class Error(val message: String) : PreLoginCheckState()
+
+
+
+
+
+
 
 }
 
 
 
+
+
+
+
+sealed class DdnsDisplayState {
+
+
+
+    object Idle : DdnsDisplayState()
+
+
+
+    object Loading : DdnsDisplayState()
+
+
+
+    data class Loaded(val externalIp: String, val ddnsAddress: String, val status: String) : DdnsDisplayState()
+
+
+
+    object NoDdnsRegistered : DdnsDisplayState()
+
+
+
+    data class Error(val message: String) : DdnsDisplayState()
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
 class MainViewModel(private val routerRepository: RouterRepository) : ViewModel() {
+
+
+
+
+
+
 
     private val _gatewayIp = MutableStateFlow<String?>(null)
 
@@ -109,6 +189,9 @@ class MainViewModel(private val routerRepository: RouterRepository) : ViewModel(
 
     private val _showExtendedFields = MutableStateFlow(false)
     val showExtendedFields: StateFlow<Boolean> = _showExtendedFields
+
+    private val _ddnsDisplayState = MutableStateFlow<DdnsDisplayState>(DdnsDisplayState.Idle)
+    val ddnsDisplayState: StateFlow<DdnsDisplayState> = _ddnsDisplayState
     
     fun navigateTo(screen: Screen) {
         _currentScreen.value = screen
@@ -131,7 +214,23 @@ class MainViewModel(private val routerRepository: RouterRepository) : ViewModel(
     val showUnauthenticatedError: StateFlow<Boolean> = _showUnauthenticatedError
 
     private val routerApiService = RouterApiService()
+    private val httpClient = HttpClient()
 
+    private suspend fun fetchPublicIpAddress(): String? {
+        return try {
+            val response = httpClient.get("https://api.ipify.org/")
+            if (response.status.isSuccess()) {
+                response.bodyAsText()
+            } else {
+                Log.e("MainViewModel", "Failed to fetch public IP: ${response.status.value}")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Error fetching public IP: ${e.message}", e)
+            null
+        }
+    }
+    
     fun unauthenticatedErrorShown() {
         _showUnauthenticatedError.value = false
     }
@@ -192,17 +291,25 @@ class MainViewModel(private val routerRepository: RouterRepository) : ViewModel(
                         Log.d("MainViewModel", "Login successful for ${router.name}.")
                         var updatedRouter = router.copy()
                         var showManualDdnsInput = false
+                        // Fetch the client's public IP address
+                        val externalIp = fetchPublicIpAddress() ?: "Unknown"
+
                         // Try to get DDNS info
                         val ddnsConfig =
                             routerApiService.getDdnsConfig(gatewayIp = router.ipAddress)
                         if (ddnsConfig?.result?.isNotEmpty() == true) {
-                            // DDNS info found, you might want to do something with it
+                            val ddnsInfo = ddnsConfig.result.first()
+                            val ddnsAddress = ddnsInfo.host ?: "Unknown"
+                            _ddnsDisplayState.value = DdnsDisplayState.Loaded(externalIp, ddnsAddress, "정상 등록")
+                            Log.d("MainViewModel", "DDNS Config found: $ddnsConfig")
                         } else {
                             showManualDdnsInput = true
+                            _ddnsDisplayState.value = DdnsDisplayState.NoDdnsRegistered
+                            Log.d("MainViewModel", "No DDNS Config found.")
                         }
 
                         _routerForExtendedFields.value = updatedRouter
-                        _showExtendedFields.value = showManualDdnsInput
+                        _showExtendedFields.value = true // Always show extended fields after login
                         _addRouterResult.value = AddRouterResult.ShowExtendedFields(
                             updatedRouter,
                             showManualDdnsInput
