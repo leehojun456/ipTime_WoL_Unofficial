@@ -1,6 +1,10 @@
 package dev.calb456.iptimewol.ui
 
+import android.app.Application
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.wifi.WifiManager
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -127,7 +131,7 @@ sealed class DdnsDisplayState {
 
 
 
-class MainViewModel(private val routerRepository: RouterRepository) : ViewModel() {
+class MainViewModel(private val routerRepository: RouterRepository, private val application: Application) : ViewModel() {
 
 
 
@@ -192,6 +196,47 @@ class MainViewModel(private val routerRepository: RouterRepository) : ViewModel(
 
     private val _ddnsDisplayState = MutableStateFlow<DdnsDisplayState>(DdnsDisplayState.Idle)
     val ddnsDisplayState: StateFlow<DdnsDisplayState> = _ddnsDisplayState
+
+    private val _isWifiConnected = MutableStateFlow(false)
+    val isWifiConnected: StateFlow<Boolean> = _isWifiConnected
+
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: android.net.Network) {
+            super.onAvailable(network)
+            Log.d("MainViewModel", "NetworkCallback: onAvailable")
+            checkWifiConnection(application.applicationContext)
+        }
+
+        override fun onLost(network: android.net.Network) {
+            super.onLost(network)
+            Log.d("MainViewModel", "NetworkCallback: onLost")
+            checkWifiConnection(application.applicationContext)
+        }
+    }
+
+    init {
+        checkWifiConnection(application.applicationContext)
+        val connectivityManager =
+            application.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val request = NetworkRequest.Builder().build()
+        connectivityManager.registerNetworkCallback(request, networkCallback)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        val connectivityManager =
+            application.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        connectivityManager.unregisterNetworkCallback(networkCallback)
+    }
+
+    fun checkWifiConnection(context: Context) {
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork
+        val capabilities = connectivityManager.getNetworkCapabilities(network)
+        _isWifiConnected.value = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+        Log.d("MainViewModel", "Wi-Fi Connected: ${_isWifiConnected.value}")
+    }
     
     fun navigateTo(screen: Screen) {
         _currentScreen.value = screen

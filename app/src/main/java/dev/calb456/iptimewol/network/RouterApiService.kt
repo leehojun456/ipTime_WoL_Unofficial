@@ -91,7 +91,7 @@ class RouterApiService {
 
     // DDNS 설정 정보 가져옴
     suspend fun getDdnsConfig(gatewayIp: String): DdnsConfigResponse? {
-                val requestBody = DdnsConfigRequest(method = "ddns/config", params = "iptime")
-                    return makePostRequest<DdnsConfigRequest, DdnsConfigResponse>(gatewayIp, requestBody, "ddns config")
-                }
-            }
+        val requestBody = DdnsConfigRequest(method = "ddns/config", params = "iptime")
+        return makePostRequest<DdnsConfigRequest, DdnsConfigResponse>(gatewayIp, requestBody, "ddns config")
+    }
+}

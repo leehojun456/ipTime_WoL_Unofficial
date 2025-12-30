@@ -29,6 +29,8 @@ import androidx.compose.material.rememberModalBottomSheetState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -65,6 +67,7 @@ fun MainScreen(
     val captchaFullUrl by viewModel.captchaFullUrl.collectAsState()
     val routerForExtendedFields by viewModel.routerForExtendedFields.collectAsState()
     val showExtendedFields by viewModel.showExtendedFields.collectAsState()
+    val isWifiConnected by viewModel.isWifiConnected.collectAsState() // Observe Wi-Fi status
 
     val routerActionSheetState = rememberModalBottomSheetState(initialValue = ModalBottomSheetValue.Hidden, skipHalfExpanded = true)
     val scope = rememberCoroutineScope()
@@ -188,38 +191,45 @@ fun MainScreen(
                         }
                     }
                 ) {
-                    Column(modifier = modifier.fillMaxSize()) {
-                        Header()
-                        LazyColumn {
-                            item {
-                                SavedRoutersCard(
-                                    savedRouters = savedRouters,
-                                    productNames = productNames,
-                                    onMoreClick = { router ->
-                                        selectedRouter = router
-                                        scope.launch { routerActionSheetState.show() }
-                                    },
-                                    onItemClick = { router ->
-                                        Log.d(
-                                            "MainScreen",
-                                            "Router clicked: $router"
-                                        )
-                                    }
-                                )
-                            }
-                            item {
-                                DiscoveredRoutersCard(
-                                    gatewayIp = gatewayIp,
-                                    productNames = productNames,
-                                    loadingIps = loadingIps,
-                                    onIpClick = {
-                                        viewModel.setCurrentGatewayIp(it)
-                                        viewModel.handleDiscoveredRouterClick(it)
-                                    },
-                                    onRefreshClick = { viewModel.getGatewayIp(context) }
-                                )
+                    Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Header()
+                            LazyColumn {
+                                item {
+                                    SavedRoutersCard(
+                                        savedRouters = savedRouters,
+                                        productNames = productNames,
+                                        onMoreClick = { router ->
+                                            selectedRouter = router
+                                            scope.launch { routerActionSheetState.show() }
+                                        },
+                                        onItemClick = { router ->
+                                            Log.d(
+                                                "MainScreen",
+                                                "Router clicked: $router"
+                                            )
+                                        }
+                                    )
+                                }
+                                item {
+                                    DiscoveredRoutersCard(
+                                        gatewayIp = gatewayIp,
+                                        productNames = productNames,
+                                        loadingIps = loadingIps,
+                                        onIpClick = {
+                                            viewModel.setCurrentGatewayIp(it)
+                                            viewModel.handleDiscoveredRouterClick(it)
+                                        },
+                                        onRefreshClick = { viewModel.getGatewayIp(context) }
+                                    )
+                                }
                             }
                         }
+                        // Display Wi-Fi status at the very bottom
+                        Text(
+                            text = if (isWifiConnected) "Wi-Fi 연결됨" else "Wi-Fi 연결 안 됨",
+                            modifier = Modifier.padding(16.dp)
+                        )
                     }
                 }
             }

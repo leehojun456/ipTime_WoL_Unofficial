@@ -12,7 +12,7 @@ class MainViewModelFactory(private val application: Application) : ViewModelProv
             @Suppress("UNCHECKED_CAST")
             val database = AppDatabase.getDatabase(application)
             val repository = RouterRepository(database.routerDao())
-            return MainViewModel(repository) as T
+            return MainViewModel(repository, application) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
