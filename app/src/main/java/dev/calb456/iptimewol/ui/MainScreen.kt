@@ -153,6 +153,12 @@ fun MainScreen(
         viewModel.getGatewayIp(context)
     }
 
+    LaunchedEffect(isWifiConnected) {
+        if (isWifiConnected) {
+            viewModel.getGatewayIp(context)
+        }
+    }
+
     AnimatedContent(
         targetState = currentScreen,
         transitionSpec = {
@@ -212,17 +218,17 @@ fun MainScreen(
                                     )
                                 }
                                 item {
-                                    DiscoveredRoutersCard(
-                                        gatewayIp = gatewayIp,
-                                        productNames = productNames,
-                                        loadingIps = loadingIps,
-                                        onIpClick = {
-                                            viewModel.setCurrentGatewayIp(it)
-                                            viewModel.handleDiscoveredRouterClick(it)
-                                        },
-                                        onRefreshClick = { viewModel.getGatewayIp(context) }
-                                    )
-                                }
+                                                                            DiscoveredRoutersCard(
+                                                                                gatewayIp = gatewayIp,
+                                                                                productNames = productNames,
+                                                                                loadingIps = loadingIps,
+                                                                                onIpClick = {
+                                                                                    viewModel.setCurrentGatewayIp(it)
+                                                                                    viewModel.handleDiscoveredRouterClick(it)
+                                                                                },
+                                                                                onRefreshClick = { viewModel.getGatewayIp(context) },
+                                                                                isWifiConnected = isWifiConnected
+                                                                            )                                }
                             }
                         }
                         // Display Wi-Fi status at the very bottom

@@ -31,7 +31,8 @@ fun DiscoveredRoutersCard(
     productNames: Map<String, String?>,
     loadingIps: Set<String>,
     onIpClick: (String) -> Unit,
-    onRefreshClick: () -> Unit
+    onRefreshClick: () -> Unit,
+    isWifiConnected: Boolean
 ) {
     Card(
         modifier = Modifier
@@ -57,39 +58,48 @@ fun DiscoveredRoutersCard(
                     )
                 }
             }
-            gatewayIp?.let { ip ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onIpClick(ip) }
-                        .padding(vertical = 4.dp) // Adjusted padding
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        val productName = productNames[ip]
-                        Text(
-                            text = productName ?: "Unknown Router",
-                            fontSize = 16.sp,
-                            color = Color.Black, // White text
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = ip,
-                            fontSize = 14.sp,
-                            color = Color.DarkGray
-                        )
+            if (isWifiConnected) {
+                gatewayIp?.let { ip ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onIpClick(ip) }
+                            .padding(vertical = 4.dp) // Adjusted padding
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            val productName = productNames[ip]
+                            Text(
+                                text = productName ?: "Unknown Router",
+                                fontSize = 16.sp,
+                                color = Color.Black, // White text
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = ip,
+                                fontSize = 14.sp,
+                                color = Color.DarkGray
+                            )
+                        }
+                        if (loadingIps.contains(ip)) {
+                            Spacer(modifier = Modifier.size(8.dp))
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                        }
                     }
-                    if (loadingIps.contains(ip)) {
-                        Spacer(modifier = Modifier.size(8.dp))
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                    }
-                }
-            } ?: Text(
-                text = "게이트웨이 IP를 찾을 수 없습니다.",
-                fontSize = 16.sp,
-                color = Color.Black, // White text
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
+                } ?: Text(
+                    text = "게이트웨이 IP를 찾을 수 없습니다.",
+                    fontSize = 16.sp,
+                    color = Color.Black, // White text
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            } else {
+                Text(
+                    text = "와이파이에 연결을 해주세요.",
+                    fontSize = 16.sp,
+                    color = Color.Black,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
         }
     }
 }
